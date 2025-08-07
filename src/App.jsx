@@ -177,6 +177,15 @@ export default function StudyTrackerApp() {
       return {};
     }
   });
+  // Uncovered portions state
+  const [uncovered, setUncovered] = useState(() => {
+    try {
+      const stored = localStorage.getItem("ca_uncovered");
+      return stored ? JSON.parse(stored) : {};
+    } catch {
+      return {};
+    }
+  });
 
   const [theme, setTheme] = useState(() => localStorage.getItem("theme") || "light");
   const [activeView, setActiveView] = useState("home");
@@ -230,6 +239,17 @@ export default function StudyTrackerApp() {
   });
   const [newTask, setNewTask] = useState({ title: "", date: "", time: "", duration: 60 });
 
+  // Custom uncovered portions state for all subjects
+  const [customUncovered, setCustomUncovered] = useState(() => {
+    try {
+      const stored = localStorage.getItem("ca_custom_uncovered");
+      return stored ? JSON.parse(stored) : [];
+    } catch {
+      return [];
+    }
+  });
+  const [newCustomUncovered, setNewCustomUncovered] = useState({ subject: '', portion: '' });
+
   useEffect(() => {
     document.documentElement.classList.toggle("dark", theme === "dark");
     localStorage.setItem("theme", theme);
@@ -238,6 +258,9 @@ export default function StudyTrackerApp() {
   useEffect(() => {
     localStorage.setItem("ca_tracker", JSON.stringify(data));
   }, [data]);
+  useEffect(() => {
+    localStorage.setItem("ca_uncovered", JSON.stringify(uncovered));
+  }, [uncovered]);
   
   useEffect(() => {
     localStorage.setItem("ca_scheduler", JSON.stringify(scheduledTasks));
@@ -246,6 +269,10 @@ export default function StudyTrackerApp() {
   useEffect(() => {
     localStorage.setItem("ca_user_profile", JSON.stringify(userProfile));
   }, [userProfile]);
+  
+  useEffect(() => {
+    localStorage.setItem("ca_custom_uncovered", JSON.stringify(customUncovered));
+  }, [customUncovered]);
   
   // Window size effect for confetti
   useEffect(() => {
@@ -511,34 +538,39 @@ export default function StudyTrackerApp() {
     }));
   };
 
-  // Calculate overall progress
+  // Calculate overall progress (subtract uncovered portions)
   const calculateOverallProgress = () => {
     let totalChapters = 0;
     let completedChapters = 0;
-    
     Object.entries(SUBJECTS).forEach(([subject, chapters]) => {
       totalChapters += chapters.length;
       completedChapters += chapters.filter(c => data[subject]?.[c]).length;
     });
-    
+    let percent = totalChapters > 0 ? (completedChapters / totalChapters) * 100 : 0;
+    // Subtract 0.5% for each custom uncovered portion
+    percent -= customUncovered.length * 0.5;
+    if (percent < 0) percent = 0;
     return {
-      percent: totalChapters > 0 ? Math.round((completedChapters / totalChapters) * 100) : 0,
+      percent: Math.round(percent),
       completed: completedChapters,
-      total: totalChapters
+      total: totalChapters,
+      uncoveredCount: customUncovered.length
     };
   };
 
-  // Prepare data for pie charts
+  // Prepare data for pie charts (subtract uncovered portions)
   const prepareSubjectData = () => {
     return Object.entries(SUBJECTS).map(([subject, chapters]) => {
       const completed = chapters.filter(c => data[subject]?.[c]).length;
-      const percent = chapters.length > 0 ? Math.round((completed / chapters.length) * 100) : 0;
-      
+      const uncoveredCount = uncovered[subject]?.length || 0;
+      const effectiveTotal = chapters.length - uncoveredCount;
+      const percent = effectiveTotal > 0 ? Math.round((completed / effectiveTotal) * 100) : 0;
       return {
         name: subject,
         value: completed,
-        total: chapters.length,
+        total: effectiveTotal,
         percent,
+        uncovered: uncoveredCount,
         color: SUBJECT_COLORS[subject].replace('bg-', '')
       };
     });
@@ -846,100 +878,149 @@ export default function StudyTrackerApp() {
         )}
 
         {activeView === "subjects" && (
-          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-            {Object.entries(SUBJECTS).map(([subject, chapters]) => {
-              const done = chapters.filter((c) => data[subject]?.[c]).length;
-              const percent = Math.round((done / chapters.length) * 100);
-              const isExpanded = expandedSubjects[subject];
-              
-              return (
-                <motion.div 
-                  key={subject} 
-                  className="shadow-lg rounded-lg overflow-hidden"
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.3 }}
-                  whileHover={{ scale: 1.02 }}
-                  layout
-                >
+          <div className="flex flex-col gap-8">
+            {/* Subject Progress Cards */}
+            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+              {Object.entries(SUBJECTS).map(([subject, chapters]) => {
+                const done = chapters.filter((c) => data[subject]?.[c]).length;
+                const percent = Math.round((done / chapters.length) * 100);
+                const isExpanded = expandedSubjects[subject];
+                return (
                   <motion.div 
-                    className={`p-4 text-white ${SUBJECT_COLORS[subject]} cursor-pointer`}
-                    onClick={() => toggleSubject(subject)}
-                    whileTap={{ scale: 0.98 }}
+                    key={subject} 
+                    className="shadow-lg rounded-lg overflow-hidden"
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.3 }}
+                    whileHover={{ scale: 1.02 }}
+                    layout
                   >
-                    <div className="flex justify-between items-center">
-                      <div className="flex items-center gap-2">
-                        <motion.div
-                          initial={{ rotate: 0 }}
-                          animate={{ rotate: isExpanded ? 180 : 0 }}
+                    <motion.div 
+                      className={`p-4 text-white ${SUBJECT_COLORS[subject]} cursor-pointer`}
+                      onClick={() => toggleSubject(subject)}
+                      whileTap={{ scale: 0.98 }}
+                    >
+                      <div className="flex justify-between items-center">
+                        <div className="flex items-center gap-2">
+                          <motion.div
+                            initial={{ rotate: 0 }}
+                            animate={{ rotate: isExpanded ? 180 : 0 }}
+                            transition={{ duration: 0.3 }}
+                          >
+                            {isExpanded ? <FiChevronUp /> : <FiChevronDown />}
+                          </motion.div>
+                          <h2 className="font-bold">{subject}</h2>
+                        </div>
+                        <motion.span 
+                          className="bg-white text-black text-xs font-semibold px-2 py-1 rounded"
+                          whileHover={{ scale: 1.1 }}
+                          whileTap={{ scale: 0.9 }}
+                        >
+                          {done}/{chapters.length}
+                        </motion.span>
+                      </div>
+                      <div className="w-full h-2 bg-white/30 rounded mt-2">
+                        <motion.div 
+                          className="h-2 bg-white rounded" 
+                          initial={{ width: 0 }}
+                          animate={{ width: `${percent}%` }}
+                          transition={{ duration: 0.8, ease: "easeOut" }}
+                        />
+                      </div>
+                    </motion.div>
+                    <AnimatePresence>
+                      {isExpanded && (
+                        <motion.div 
+                          className="bg-white dark:bg-zinc-800 p-3 max-h-64 overflow-y-auto"
+                          initial={{ height: 0, opacity: 0 }}
+                          animate={{ height: "auto", opacity: 1 }}
+                          exit={{ height: 0, opacity: 0 }}
                           transition={{ duration: 0.3 }}
                         >
-                          {isExpanded ? <FiChevronUp /> : <FiChevronDown />}
+                          <div className="space-y-1">
+                            {chapters.map((chapter, index) => (
+                              <motion.label 
+                                key={chapter} 
+                                className="flex items-center space-x-2 text-zinc-900 dark:text-white"
+                                initial={{ opacity: 0, x: -10 }}
+                                animate={{ opacity: 1, x: 0 }}
+                                transition={{ delay: index * 0.03 }}
+                                whileHover={{ scale: 1.01, x: 3 }}
+                              >
+                                <input
+                                  type="checkbox"
+                                  className="accent-indigo-500"
+                                  checked={data[subject]?.[chapter] || false}
+                                  onChange={() => toggleChapter(subject, chapter)}
+                                />
+                                <span className="text-sm">{chapter}</span>
+                                {data[subject]?.[chapter] && (
+                                  <motion.span
+                                    initial={{ scale: 0 }}
+                                    animate={{ scale: 1 }}
+                                    className="text-green-500 ml-auto"
+                                  >
+                                    <FiCheck />
+                                  </motion.span>
+                                )}
+                              </motion.label>
+                            ))}
+                          </div>
                         </motion.div>
-                        <h2 className="font-bold">{subject}</h2>
-                      </div>
-                      <motion.span 
-                        className="bg-white text-black text-xs font-semibold px-2 py-1 rounded"
-                        whileHover={{ scale: 1.1 }}
-                        whileTap={{ scale: 0.9 }}
-                      >
-                        {done}/{chapters.length}
-                      </motion.span>
-                    </div>
-                    <div className="w-full h-2 bg-white/30 rounded mt-2">
-                      <motion.div 
-                        className="h-2 bg-white rounded" 
-                        initial={{ width: 0 }}
-                        animate={{ width: `${percent}%` }}
-                        transition={{ duration: 0.8, ease: "easeOut" }}
-                      />
-                    </div>
+                      )}
+                    </AnimatePresence>
                   </motion.div>
-                  
-                  <AnimatePresence>
-                    {isExpanded && (
-                      <motion.div 
-                        className="bg-white dark:bg-zinc-800 p-3 max-h-64 overflow-y-auto"
-                        initial={{ height: 0, opacity: 0 }}
-                        animate={{ height: "auto", opacity: 1 }}
-                        exit={{ height: 0, opacity: 0 }}
-                        transition={{ duration: 0.3 }}
-                      >
-                        <div className="space-y-1">
-                          {chapters.map((chapter, index) => (
-                            <motion.label 
-                              key={chapter} 
-                              className="flex items-center space-x-2 text-zinc-900 dark:text-white"
-                              initial={{ opacity: 0, x: -10 }}
-                              animate={{ opacity: 1, x: 0 }}
-                              transition={{ delay: index * 0.03 }}
-                              whileHover={{ scale: 1.01, x: 3 }}
-                            >
-                              <input
-                                type="checkbox"
-                                className="accent-indigo-500"
-                                checked={data[subject]?.[chapter] || false}
-                                onChange={() => toggleChapter(subject, chapter)}
-                              />
-                              <span className="text-sm">{chapter}</span>
-                              {data[subject]?.[chapter] && (
-                                <motion.span
-                                  initial={{ scale: 0 }}
-                                  animate={{ scale: 1 }}
-                                  className="text-green-500 ml-auto"
-                                >
-                                  <FiCheck />
-                                </motion.span>
-                              )}
-                            </motion.label>
-                          ))}
-                        </div>
-                      </motion.div>
-                    )}
-                  </AnimatePresence>
-                </motion.div>
-              );
-            })}
+                );
+              })}
+            </div>
+            {/* Custom Uncovered Portions Tab */}
+            <div className="bg-white dark:bg-zinc-800 p-6 rounded-xl shadow-lg">
+              <h2 className="text-2xl font-bold mb-4 text-zinc-900 dark:text-white">Custom Uncovered Portions</h2>
+              <form className="flex gap-2 mb-6" onSubmit={e => {
+                e.preventDefault();
+                if (newCustomUncovered.subject && newCustomUncovered.portion) {
+                  setCustomUncovered(prev => [...prev, { ...newCustomUncovered }]);
+                  setNewCustomUncovered({ subject: '', portion: '' });
+                }
+              }}>
+                <select
+                  className="px-2 py-1 border rounded"
+                  value={newCustomUncovered.subject}
+                  onChange={e => setNewCustomUncovered(prev => ({ ...prev, subject: e.target.value }))}
+                  required
+                >
+                  <option value="">Select Subject</option>
+                  {Object.keys(SUBJECTS).map(subj => (
+                    <option key={subj} value={subj}>{subj}</option>
+                  ))}
+                </select>
+                <input
+                  type="text"
+                  className="px-2 py-1 border rounded flex-1"
+                  placeholder="Uncovered Portion (e.g. chapter/topic name)"
+                  value={newCustomUncovered.portion}
+                  onChange={e => setNewCustomUncovered(prev => ({ ...prev, portion: e.target.value }))}
+                  required
+                />
+                <button type="submit" className="px-4 py-1 bg-indigo-600 text-white rounded">Add</button>
+              </form>
+              {customUncovered.length === 0 ? (
+                <p className="text-zinc-500 italic">No uncovered portions added yet.</p>
+              ) : (
+                <div className="space-y-2">
+                  {customUncovered.map((item, idx) => (
+                    <div key={idx} className="flex items-center gap-2 p-2 bg-red-50 dark:bg-red-900/20 rounded">
+                      <span className="font-semibold text-red-700 dark:text-red-400">{item.subject}:</span>
+                      <span className="text-zinc-900 dark:text-white">{item.portion}</span>
+                      <button
+                        className="ml-auto px-2 py-1 text-xs bg-gray-300 dark:bg-zinc-700 rounded text-gray-700 dark:text-white"
+                        onClick={() => setCustomUncovered(prev => prev.filter((_, i) => i !== idx))}
+                      >Remove</button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
         )}
 
@@ -972,6 +1053,11 @@ export default function StudyTrackerApp() {
                   <div className="text-4xl font-bold text-indigo-600">{overallProgress.percent}%</div>
                   <div className="text-zinc-600 dark:text-zinc-300">
                     {overallProgress.completed} of {overallProgress.total} chapters completed
+                  </div>
+                  <div className="mt-2 text-sm text-red-600 dark:text-red-400">
+                    {overallProgress.uncoveredCount > 0 && (
+                      <>Progress reduced by {overallProgress.uncoveredCount * 0.5}% due to {overallProgress.uncoveredCount} uncovered portion(s).</>
+                    )}
                   </div>
                 </div>
               </div>
