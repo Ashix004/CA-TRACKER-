@@ -1,0 +1,226 @@
+// File: src/App.jsx
+import { useState, useEffect } from "react";
+import { Switch } from "@/components/ui/switch";
+
+const SUBJECTS = {
+  "Advanced Accounting": [
+    "Introduction to Accounting Standards",
+    "Framework for Preparation and Presentation of Financial Statements",
+    "Applicability of Accounting Standards",
+    "Presentation & Disclosures Based Accounting Standards",
+    "AS 1 Disclosure of Accounting Policies",
+    "AS 3 Cash Flow Statement",
+    "AS 17 Segment Reporting",
+    "AS 18 Related Party Disclosures",
+    "AS 20 Earnings Per Share",
+    "AS 24 Discontinuing Operations",
+    "AS 25 Interim Financial Reporting",
+    "AS 2 Valuation of Inventory",
+    "AS 10 Property, Plant and Equipment",
+    "AS 13 Accounting for Investments",
+    "AS 16 Borrowing Costs",
+    "AS 19 Leases",
+    "AS 26 Intangible Assets",
+    "AS 28 Impairment of Assets",
+    "AS 15 Employee Benefits",
+    "AS 29 Provisions, Contingent Liabilities and Contingent Assets",
+    "AS 4 Contingencies and Events after Balance Sheet Date",
+    "AS 5 Net Profit/Loss and Prior Period Items",
+    "AS 11 Foreign Exchange Rates",
+    "AS 22 Taxes on Income",
+    "AS 7 Construction Contracts",
+    "AS 9 Revenue Recognition",
+    "AS 12 Government Grants",
+    "AS 14 Amalgamations",
+    "AS 21 Consolidated Financial Statements",
+    "AS 23 Associates in Consolidated Financial Statements",
+    "AS 27 Joint Ventures",
+    "Financial Statements of Companies",
+    "Buyback of Securities",
+    "Amalgamation of Companies",
+    "Internal Reconstruction",
+    "Accounting for Branches"
+  ],
+  "Corporate and Other Law": [
+    "Preliminary",
+    "Incorporation of Company",
+    "Prospectus and Allotment",
+    "Share Capital and Debentures",
+    "Acceptance of Deposits",
+    "Registration of Charges",
+    "Management & Administration",
+    "Declaration and Dividend",
+    "Accounts of Companies",
+    "Audit and Auditors",
+    "Companies Outside India",
+    "LLP Act 2008",
+    "General Clauses Act",
+    "Interpretation of Statutes",
+    "FEMA 1999"
+  ],
+  "Taxation": [
+    "Basic Concepts",
+    "Residence and Scope",
+    "Salaries",
+    "House Property",
+    "Profits and Gains of Business",
+    "Capital Gains",
+    "Other Sources",
+    "Income of Other Persons",
+    "Aggregation and Set-Off",
+    "Deductions",
+    "Advance Tax and TDS",
+    "Return Filing and Assessment",
+    "Income Tax Computation",
+    "GST Introduction",
+    "Supply under GST",
+    "Charge of GST",
+    "Place of Supply",
+    "Exemptions",
+    "Time of Supply",
+    "Value of Supply",
+    "Input Tax Credit",
+    "Registration",
+    "Tax Invoice",
+    "Accounts and Records",
+    "E-Way Bill",
+    "Payment of Tax",
+    "TDS and TCS in GST",
+    "Returns"
+  ],
+  "Cost and Management Accounting": [
+    "Introduction to Cost and Management Accounting",
+    "Material Cost",
+    "Employee Cost",
+    "Overheads",
+    "Activity Based Costing",
+    "Cost Sheet",
+    "Cost Accounting Systems",
+    "Unit & Batch Costing",
+    "Job Costing",
+    "Process & Operation Costing",
+    "Joint Products and By Products",
+    "Service Costing",
+    "Standard Costing",
+    "Marginal Costing",
+    "Budgets and Budgetary Control"
+  ],
+  "Auditing and Ethics": [
+    "Nature, Objective and Scope of Audit",
+    "Audit Strategy and Planning",
+    "Risk Assessment and Internal Control",
+    "Audit Evidence",
+    "Audit of Items of Financial Statements",
+    "Audit Documentation",
+    "Completion and Review",
+    "Audit Report",
+    "Audit of Different Entities",
+    "Audit of Banks",
+    "Ethics and Terms of Audit Engagements"
+  ],
+  "FM and SM": [
+    "Scope and Objectives of Financial Management",
+    "Types of Financing",
+    "Ratio Analysis",
+    "Cost of Capital",
+    "Capital Structure",
+    "Leverages",
+    "Investment Decisions",
+    "Dividend Decision",
+    "Working Capital Management",
+    "Cash Management",
+    "Inventory Management",
+    "Receivables Management",
+    "Payables Management",
+    "Financing Working Capital",
+    "Strategic Management Intro",
+    "External Environment Analysis",
+    "Internal Environment Analysis",
+    "Strategic Choices",
+    "Strategy Implementation and Evaluation"
+  ]
+};
+
+const SUBJECT_COLORS = {
+  "Advanced Accounting": "bg-indigo-500",
+  "Corporate and Other Law": "bg-green-500",
+  "Taxation": "bg-yellow-500",
+  "Cost and Management Accounting": "bg-purple-500",
+  "Auditing and Ethics": "bg-red-500",
+  "FM and SM": "bg-blue-500"
+};
+
+export default function StudyTrackerApp() {
+  const [data, setData] = useState(() => {
+    try {
+      const stored = localStorage.getItem("ca_tracker");
+      return stored ? JSON.parse(stored) : {};
+    } catch {
+      return {};
+    }
+  });
+
+  const [theme, setTheme] = useState(() => localStorage.getItem("theme") || "light");
+
+  useEffect(() => {
+    document.documentElement.classList.toggle("dark", theme === "dark");
+    localStorage.setItem("theme", theme);
+  }, [theme]);
+
+  useEffect(() => {
+    localStorage.setItem("ca_tracker", JSON.stringify(data));
+  }, [data]);
+
+  const toggleChapter = (subject, chapter) => {
+    const updated = { ...data };
+    if (!updated[subject]) updated[subject] = {};
+    updated[subject][chapter] = !updated[subject][chapter];
+    setData(updated);
+  };
+
+  return (
+    <div className="max-w-6xl mx-auto p-6 space-y-6">
+      <div className="flex justify-between items-center">
+        <h1 className="text-4xl font-bold text-indigo-700">📘 CA Study Tracker</h1>
+        <div className="flex items-center gap-2">
+          <span>🌞</span>
+          <Switch checked={theme === "dark"} onCheckedChange={(val) => setTheme(val ? "dark" : "light")} />
+          <span>🌙</span>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+        {Object.entries(SUBJECTS).map(([subject, chapters]) => {
+          const done = chapters.filter((c) => data[subject]?.[c]).length;
+          const percent = Math.round((done / chapters.length) * 100);
+          return (
+            <div key={subject} className="shadow-xl rounded-xl overflow-hidden">
+              <div className={`p-5 text-white ${SUBJECT_COLORS[subject]}`}>
+                <div className="flex justify-between items-center mb-2">
+                  <h2 className="text-lg font-bold">{subject}</h2>
+                  <span className="bg-white text-black text-xs font-semibold px-2 py-1 rounded">{done}/{chapters.length}</span>
+                </div>
+                <div className="w-full h-2 bg-white/30 rounded">
+                  <div className="h-2 bg-white rounded" style={{ width: `${percent}%` }}></div>
+                </div>
+                <div className="mt-3 space-y-1 max-h-64 overflow-y-auto">
+                  {chapters.map((chapter) => (
+                    <label key={chapter} className="flex items-center space-x-2">
+                      <input
+                        type="checkbox"
+                        className="accent-white"
+                        checked={data[subject]?.[chapter] || false}
+                        onChange={() => toggleChapter(subject, chapter)}
+                      />
+                      <span className="text-sm">{chapter}</span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
